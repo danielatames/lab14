@@ -4,6 +4,10 @@ void main() {
   runApp(const FocusTrackApp());
 }
 
+/// Niveles de prioridad de la sesion de trabajo
+enum Prioridad { baja, media, alta }
+
+/// Widget raiz inmutable que configura el tema visual de la aplicacion
 class FocusTrackApp extends StatelessWidget {
   const FocusTrackApp({super.key});
 
@@ -15,7 +19,12 @@ class FocusTrackApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color.fromARGB(255, 255, 99, 190),
+          seedColor: const Color.fromARGB(
+            255,
+            255,
+            148,
+            237,
+          ), // Verde Esmeralda
           brightness: Brightness.light,
         ),
         appBarTheme: const AppBarTheme(centerTitle: true, elevation: 2),
@@ -25,6 +34,7 @@ class FocusTrackApp extends StatelessWidget {
   }
 }
 
+/// Pantalla con estado reactivo para registrar metas y productividad
 class PantallaPrincipalMetas extends StatefulWidget {
   const PantallaPrincipalMetas({super.key});
 
@@ -33,9 +43,28 @@ class PantallaPrincipalMetas extends StatefulWidget {
 }
 
 class _PantallaPrincipalMetasState extends State<PantallaPrincipalMetas> {
+  static const int _limiteDiario = 10;
+
   int _metasCompletadas = 0;
   final int _metaObjetivo = 5;
   String _nivelProductividad = 'Inicial';
+  Prioridad _prioridad = Prioridad.media;
+
+  // ---------- Reto 1: utilidades de prioridad ----------
+
+  Color _colorPrioridad(Prioridad p) => switch (p) {
+    Prioridad.baja => Colors.blueGrey,
+    Prioridad.media => Colors.amber.shade800,
+    Prioridad.alta => const Color(0xFF8B1A1A), // Borgoña
+  };
+
+  String _textoPrioridad(Prioridad p) => switch (p) {
+    Prioridad.baja => 'Baja',
+    Prioridad.media => 'Media',
+    Prioridad.alta => 'Alta',
+  };
+
+  // ---------- Logica de metas ----------
 
   void _actualizarNivel() {
     if (_metasCompletadas == 0) {
@@ -50,7 +79,22 @@ class _PantallaPrincipalMetasState extends State<PantallaPrincipalMetas> {
     }
   }
 
+  /// Reto 2: incrementa respetando el limite maximo diario
   void _incrementarMeta() {
+    if (_metasCompletadas >= _limiteDiario) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Ha alcanzado el límite máximo diario de metas (10/10). '
+              '¡Excelente jornada!',
+            ),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      return;
+    }
     setState(() {
       _metasCompletadas++;
       _actualizarNivel();
@@ -102,11 +146,14 @@ class _PantallaPrincipalMetasState extends State<PantallaPrincipalMetas> {
     );
   }
 
+  // ---------- Interfaz ----------
+
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
     final colores = tema.colorScheme;
     final porcentaje = (_metasCompletadas / _metaObjetivo).clamp(0.0, 1.0);
+    final colorPrioridad = _colorPrioridad(_prioridad);
 
     return Scaffold(
       appBar: AppBar(
@@ -121,13 +168,14 @@ class _PantallaPrincipalMetasState extends State<PantallaPrincipalMetas> {
           ),
         ],
       ),
-
+      // SafeArea garantiza visualizacion correcta fuera del notch
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Tarjeta de Resumen Ejecutivo
               Card(
                 elevation: 3.0,
                 shape: RoundedRectangleBorder(
@@ -193,18 +241,58 @@ class _PantallaPrincipalMetasState extends State<PantallaPrincipalMetas> {
                 ),
               ),
               const SizedBox(height: 24.0),
+
+              // Reto 1: Selector de Prioridad
+              Text(
+                'Prioridad de la sesión',
+                style: tema.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8.0),
+              SegmentedButton<Prioridad>(
+                segments: const [
+                  ButtonSegment(
+                    value: Prioridad.baja,
+                    label: Text('Baja'),
+                    icon: Icon(Icons.arrow_downward),
+                  ),
+                  ButtonSegment(
+                    value: Prioridad.media,
+                    label: Text('Media'),
+                    icon: Icon(Icons.drag_handle),
+                  ),
+                  ButtonSegment(
+                    value: Prioridad.alta,
+                    label: Text('Alta'),
+                    icon: Icon(Icons.priority_high),
+                  ),
+                ],
+                selected: {_prioridad},
+                onSelectionChanged: (Set<Prioridad> seleccion) {
+                  setState(() => _prioridad = seleccion.first);
+                },
+                style: SegmentedButton.styleFrom(
+                  selectedBackgroundColor: colorPrioridad,
+                  selectedForegroundColor: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 24.0),
+
+              // Panel de Informacion Tecnica (refleja la prioridad)
               Card(
                 elevation: 1.0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12.0),
-                  side: BorderSide(color: colores.outlineVariant),
+                  side: BorderSide(color: colorPrioridad, width: 1.5),
                 ),
-                child: const ListTile(
-                  leading: Icon(Icons.info_outline),
-                  title: Text('Sesión Móvil Activa'),
+                child: ListTile(
+                  leading: Icon(Icons.flag, color: colorPrioridad),
+                  title: const Text('Sesión Móvil Activa'),
                   subtitle: Text(
-                    'Renderizado nativo impulsado por el motor Impeller '
-                    'y gestionado con Hot Reload.',
+                    'Prioridad: ${_textoPrioridad(_prioridad)} · '
+                    'Renderizado con Impeller y Hot Reload.',
+                    style: TextStyle(color: colorPrioridad),
                   ),
                 ),
               ),
@@ -212,6 +300,7 @@ class _PantallaPrincipalMetasState extends State<PantallaPrincipalMetas> {
           ),
         ),
       ),
+      // Botones Flotantes de Accion
       floatingActionButton: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
